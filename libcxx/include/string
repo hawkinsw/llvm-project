@@ -657,6 +657,29 @@ typedef basic_string<char32_t> u32string;
 
 struct __uninitialized_size_tag {};
 
+template<class _CharT, class _Traits, class _Allocator, class _T>
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_AFTER_CXX17
+__enable_if_t<__can_be_converted_to_string_view<_CharT, _Traits, _T>::value, basic_string<_CharT, _Traits, _Allocator>>
+operator+(const basic_string<_CharT, _Traits, _Allocator>& __lhs, const _T& __rhs);
+
+
+template<class _CharT, class _Traits, class _Allocator, class _T>
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_AFTER_CXX17
+__enable_if_t<__can_be_converted_to_string_view<_CharT, _Traits, _T>::value, basic_string<_CharT, _Traits, _Allocator>>
+operator+(basic_string<_CharT, _Traits, _Allocator>&& __lhs, const _T& __rhs);
+
+
+template<class _CharT, class _Traits, class _Allocator, class _T>
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_AFTER_CXX17
+__enable_if_t<__can_be_converted_to_string_view<_CharT, _Traits, _T>::value, basic_string<_CharT, _Traits, _Allocator>>
+operator+(const _T& __lhs, const basic_string<_CharT, _Traits, _Allocator>& __rhs);
+
+
+template<class _CharT, class _Traits, class _Allocator, class _T>
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_AFTER_CXX17
+__enable_if_t<__can_be_converted_to_string_view<_CharT, _Traits, _T>::value, basic_string<_CharT, _Traits, _Allocator>>
+operator+(const _T& __lhs, basic_string<_CharT, _Traits, _Allocator>&& __rhs);
+
 template<class _CharT, class _Traits, class _Allocator>
 class
     _LIBCPP_TEMPLATE_VIS
@@ -1828,6 +1851,8 @@ private:
     friend _LIBCPP_CONSTEXPR_SINCE_CXX20 basic_string operator+<>(value_type, const basic_string&);
     friend _LIBCPP_CONSTEXPR_SINCE_CXX20 basic_string operator+<>(const basic_string&, const value_type*);
     friend _LIBCPP_CONSTEXPR_SINCE_CXX20 basic_string operator+<>(const basic_string&, value_type);
+    friend _LIBCPP_CONSTEXPR_AFTER_CXX20 basic_string operator+<>(const basic_string&, const __self_view&);
+    friend _LIBCPP_CONSTEXPR_AFTER_CXX20 basic_string operator+<>(const __self_view&, const basic_string&);
 };
 
 // These declarations must appear before any functions are implicitly used
@@ -4473,6 +4498,60 @@ operator+(const basic_string<_CharT, _Traits, _Allocator>& __lhs, _CharT __rhs)
     _Traits::assign(__ptr + __lhs_sz, 1, __rhs);
     _Traits::assign(__ptr + 1 + __lhs_sz, 1, _CharT());
     return __r;
+}
+
+template<class _CharT, class _Traits, class _Allocator, class _T>
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_AFTER_CXX17
+__enable_if_t<__can_be_converted_to_string_view<_CharT, _Traits, _T>::value, basic_string<_CharT, _Traits, _Allocator>>
+operator+(const basic_string<_CharT, _Traits, _Allocator>& __lhs, const _T& __rhs)
+{
+    using _String = basic_string<_CharT, _Traits, _Allocator>;
+    typename _String::size_type __lhs_sz = __lhs.size();
+    typename _String::size_type __rhs_sz = __rhs.size();
+    _String __r(__uninitialized_size_tag(),
+                __lhs_sz + __rhs_sz,
+                _String::__alloc_traits::select_on_container_copy_construction(__lhs.get_allocator()));
+    auto __ptr = std::__to_address(__r.__get_pointer());
+    _Traits::copy(__ptr, __lhs.data(), __lhs_sz);
+    _Traits::copy(__ptr + __lhs_sz, __rhs.data(), __rhs_sz);
+    _Traits::assign(__ptr + __lhs_sz + __rhs_sz, 1, _CharT());
+    return __r;
+}
+
+template<class _CharT, class _Traits, class _Allocator, class _T>
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_AFTER_CXX17
+__enable_if_t<__can_be_converted_to_string_view<_CharT, _Traits, _T>::value, basic_string<_CharT, _Traits, _Allocator>>
+operator+(basic_string<_CharT, _Traits, _Allocator>&& __lhs, const _T& __rhs)
+{
+    __lhs.append(__rhs);
+    return std::move(__lhs);
+}
+
+template<class _CharT, class _Traits, class _Allocator, class _T>
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_AFTER_CXX17
+__enable_if_t<__can_be_converted_to_string_view<_CharT, _Traits, _T>::value, basic_string<_CharT, _Traits, _Allocator>>
+operator+(const _T& __lhs, const basic_string<_CharT, _Traits, _Allocator>& __rhs)
+{
+    using _String = basic_string<_CharT, _Traits, _Allocator>;
+    typename _String::size_type __lhs_sz = __lhs.size();
+    typename _String::size_type __rhs_sz = __rhs.size();
+    _String __r(__uninitialized_size_tag(),
+                __lhs_sz + __rhs_sz,
+                _String::__alloc_traits::select_on_container_copy_construction(__rhs.get_allocator()));
+    auto __ptr = std::__to_address(__r.__get_pointer());
+    _Traits::copy(__ptr, __lhs.data(), __lhs_sz);
+    _Traits::copy(__ptr + __lhs_sz, __rhs.data(), __rhs_sz);
+    _Traits::assign(__ptr + __lhs_sz + __rhs_sz, 1, _CharT());
+    return __r;
+}
+
+template<class _CharT, class _Traits, class _Allocator, class _T>
+_LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_AFTER_CXX17
+__enable_if_t<__can_be_converted_to_string_view<_CharT, _Traits, _T>::value, basic_string<_CharT, _Traits, _Allocator>>
+operator+(const _T& __lhs, basic_string<_CharT, _Traits, _Allocator>&& __rhs)
+{
+    __rhs.insert(0, __lhs);
+    return std::move(__rhs);
 }
 
 #ifndef _LIBCPP_CXX03_LANG
