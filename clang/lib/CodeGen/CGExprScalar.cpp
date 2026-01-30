@@ -524,6 +524,11 @@ public:
     return Visit(E->getReplacement());
   }
   Value *VisitGenericSelectionExpr(GenericSelectionExpr *GE) {
+    CodeGenFunction::LexicalScope LS(CGF, GE->getSourceRange());
+    VarDecl *VD = GE->getResultDecl();
+    if (VD) {
+      CGF.EmitVarDecl(*VD);
+    }
     return Visit(GE->getResultExpr());
   }
   Value *VisitCoawaitExpr(CoawaitExpr *S) {

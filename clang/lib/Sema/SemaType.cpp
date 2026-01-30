@@ -3376,6 +3376,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
       [[fallthrough]];
     case DeclaratorContext::TypeName:
     case DeclaratorContext::Association:
+    case DeclaratorContext::AssociationExtended:
       Error = 15; // Generic
       break;
     case DeclaratorContext::File:
@@ -3492,6 +3493,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::TemplateArg:
     case DeclaratorContext::TemplateTypeArg:
     case DeclaratorContext::Association:
+    case DeclaratorContext::AssociationExtended:
       DiagID = diag::err_type_defined_in_type_specifier;
       break;
     case DeclaratorContext::Prototype:
@@ -4569,6 +4571,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::FunctionalCast:
     case DeclaratorContext::RequiresExpr:
     case DeclaratorContext::Association:
+    case DeclaratorContext::AssociationExtended:
       // Don't infer in these contexts.
       break;
     }
@@ -5740,6 +5743,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::TemplateArg:
     case DeclaratorContext::TemplateTypeArg:
     case DeclaratorContext::Association:
+    case DeclaratorContext::AssociationExtended:
       // FIXME: We may want to allow parameter packs in block-literal contexts
       // in the future.
       S.Diag(D.getEllipsisLoc(),

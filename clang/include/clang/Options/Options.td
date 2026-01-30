@@ -3048,6 +3048,10 @@ defm gnu_keywords : BoolFOption<"gnu-keywords",
   LangOpts<"GNUKeywords">, Default<gnu_mode.KeyPath>,
   PosFlag<SetTrue, [], [ClangOption], "Allow GNU-extension keywords regardless of language standard">,
   NegFlag<SetFalse>, BothFlags<[], [ClangOption, CC1Option]>>;
+defm experimental_mode : BoolFOption<"experimental-mode",
+  LangOpts<"ExperimentalMode">, DefaultFalse,
+  PosFlag<SetTrue, [], [ClangOption], "Experimental mode">,
+  NegFlag<SetFalse>, BothFlags<[], [CC1Option]>>;
 defm gnu89_inline : BoolFOption<"gnu89-inline",
   LangOpts<"GNUInline">, Default<!strconcat("!", c99.KeyPath, " && !", cplusplus.KeyPath)>,
   PosFlag<SetTrue, [], [ClangOption, CC1Option],

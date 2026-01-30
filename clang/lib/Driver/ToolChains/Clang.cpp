@@ -7404,6 +7404,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   Args.AddLastArg(CmdArgs, options::OPT_fgnu_keywords,
                   options::OPT_fno_gnu_keywords);
 
+  Args.AddLastArg(CmdArgs, options::OPT_fexperimental_mode,
+                  options::OPT_fno_experimental_mode);
+
   Args.addOptInFlag(CmdArgs, options::OPT_fgnu89_inline,
                     options::OPT_fno_gnu89_inline);
 

@@ -1696,6 +1696,7 @@ void StmtProfiler::VisitBlockExpr(const BlockExpr *S) {
 }
 
 void StmtProfiler::VisitGenericSelectionExpr(const GenericSelectionExpr *S) {
+  llvm_unreachable("Unexpected NoInitExpr in syntactic form of initializer");
   VisitExpr(S);
   for (const GenericSelectionExpr::ConstAssociation Assoc :
        S->associations()) {
