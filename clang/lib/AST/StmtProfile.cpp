@@ -1754,6 +1754,8 @@ void StmtProfiler::VisitGenericSelectionExpr(const GenericSelectionExpr *S) {
       ID.AddPointer(nullptr);
     else
       VisitType(T);
+    if (const VarDecl *AD = Assoc.getAssocDecl())
+      VisitDecl(AD);
     VisitExpr(Assoc.getAssociationExpr());
   }
 }

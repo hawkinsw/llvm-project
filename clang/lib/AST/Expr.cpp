@@ -16,6 +16,7 @@
 #include "clang/AST/ASTLambda.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/ComputeDependence.h"
+#include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
@@ -29,6 +30,7 @@
 #include "clang/AST/TypeBase.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Lexer.h"
@@ -4625,7 +4627,9 @@ void ShuffleVectorExpr::setExprs(const ASTContext &C, ArrayRef<Expr *> Exprs) {
 
 GenericSelectionExpr::GenericSelectionExpr(
     const ASTContext &, SourceLocation GenericLoc, Expr *ControllingExpr,
-    ArrayRef<TypeSourceInfo *> AssocTypes, ArrayRef<Expr *> AssocExprs,
+    ArrayRef<TypeSourceInfo *> AssocTypes,
+    ArrayRef<VarDecl *> AssocDecls,
+    ArrayRef<Expr *> AssocExprs,
     SourceLocation DefaultLoc, SourceLocation RParenLoc,
     bool ContainsUnexpandedParameterPack, unsigned ResultIndex)
     : Expr(GenericSelectionExprClass, AssocExprs[ResultIndex]->getType(),
@@ -4645,6 +4649,7 @@ GenericSelectionExpr::GenericSelectionExpr(
              getTrailingObjects<Stmt *>() + getIndexOfStartOfAssociatedExprs());
   llvm::copy(AssocTypes, getTrailingObjects<TypeSourceInfo *>() +
                              getIndexOfStartOfAssociatedTypes());
+  llvm::copy(AssocDecls, getTrailingObjects<VarDecl *>());
 
   setDependence(computeDependence(this, ContainsUnexpandedParameterPack));
 }
@@ -4652,6 +4657,7 @@ GenericSelectionExpr::GenericSelectionExpr(
 GenericSelectionExpr::GenericSelectionExpr(
     const ASTContext &, SourceLocation GenericLoc,
     TypeSourceInfo *ControllingType, ArrayRef<TypeSourceInfo *> AssocTypes,
+    ArrayRef<VarDecl *> AssocDecls,
     ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
     SourceLocation RParenLoc, bool ContainsUnexpandedParameterPack,
     unsigned ResultIndex)
@@ -4672,13 +4678,16 @@ GenericSelectionExpr::GenericSelectionExpr(
              getTrailingObjects<Stmt *>() + getIndexOfStartOfAssociatedExprs());
   llvm::copy(AssocTypes, getTrailingObjects<TypeSourceInfo *>() +
                              getIndexOfStartOfAssociatedTypes());
+  llvm::copy(AssocDecls, getTrailingObjects<VarDecl *>());
 
   setDependence(computeDependence(this, ContainsUnexpandedParameterPack));
 }
 
 GenericSelectionExpr::GenericSelectionExpr(
     const ASTContext &Context, SourceLocation GenericLoc, Expr *ControllingExpr,
-    ArrayRef<TypeSourceInfo *> AssocTypes, ArrayRef<Expr *> AssocExprs,
+    ArrayRef<TypeSourceInfo *> AssocTypes,
+    ArrayRef<VarDecl *> AssocDecls,
+    ArrayRef<Expr *> AssocExprs,
     SourceLocation DefaultLoc, SourceLocation RParenLoc,
     bool ContainsUnexpandedParameterPack)
     : Expr(GenericSelectionExprClass, Context.DependentTy, VK_PRValue,
@@ -4696,13 +4705,14 @@ GenericSelectionExpr::GenericSelectionExpr(
              getTrailingObjects<Stmt *>() + getIndexOfStartOfAssociatedExprs());
   llvm::copy(AssocTypes, getTrailingObjects<TypeSourceInfo *>() +
                              getIndexOfStartOfAssociatedTypes());
-
+  llvm::copy(AssocDecls, getTrailingObjects<VarDecl *>());
   setDependence(computeDependence(this, ContainsUnexpandedParameterPack));
 }
 
 GenericSelectionExpr::GenericSelectionExpr(
     const ASTContext &Context, SourceLocation GenericLoc,
     TypeSourceInfo *ControllingType, ArrayRef<TypeSourceInfo *> AssocTypes,
+    ArrayRef<VarDecl *> AssocDecls,
     ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
     SourceLocation RParenLoc, bool ContainsUnexpandedParameterPack)
     : Expr(GenericSelectionExprClass, Context.DependentTy, VK_PRValue,
@@ -4720,7 +4730,7 @@ GenericSelectionExpr::GenericSelectionExpr(
              getTrailingObjects<Stmt *>() + getIndexOfStartOfAssociatedExprs());
   llvm::copy(AssocTypes, getTrailingObjects<TypeSourceInfo *>() +
                              getIndexOfStartOfAssociatedTypes());
-
+  llvm::copy(AssocDecls, getTrailingObjects<VarDecl *>());
   setDependence(computeDependence(this, ContainsUnexpandedParameterPack));
 }
 
@@ -4729,58 +4739,60 @@ GenericSelectionExpr::GenericSelectionExpr(EmptyShell Empty, unsigned NumAssocs)
 
 GenericSelectionExpr *GenericSelectionExpr::Create(
     const ASTContext &Context, SourceLocation GenericLoc, Expr *ControllingExpr,
-    ArrayRef<TypeSourceInfo *> AssocTypes, ArrayRef<Expr *> AssocExprs,
+    ArrayRef<TypeSourceInfo *> AssocTypes, ArrayRef<VarDecl *> AssocDecls, ArrayRef<Expr *> AssocExprs,
     SourceLocation DefaultLoc, SourceLocation RParenLoc,
     bool ContainsUnexpandedParameterPack, unsigned ResultIndex) {
   unsigned NumAssocs = AssocExprs.size();
   void *Mem = Context.Allocate(
-      totalSizeToAlloc<Stmt *, TypeSourceInfo *>(1 + NumAssocs, NumAssocs),
+      totalSizeToAlloc<Stmt *, TypeSourceInfo *, VarDecl *>(1 + NumAssocs, NumAssocs, NumAssocs),
       alignof(GenericSelectionExpr));
   return new (Mem) GenericSelectionExpr(
-      Context, GenericLoc, ControllingExpr, AssocTypes, AssocExprs, DefaultLoc,
+      Context, GenericLoc, ControllingExpr, AssocTypes, AssocDecls, AssocExprs, DefaultLoc,
       RParenLoc, ContainsUnexpandedParameterPack, ResultIndex);
 }
 
 GenericSelectionExpr *GenericSelectionExpr::Create(
     const ASTContext &Context, SourceLocation GenericLoc, Expr *ControllingExpr,
-    ArrayRef<TypeSourceInfo *> AssocTypes, ArrayRef<Expr *> AssocExprs,
+    ArrayRef<TypeSourceInfo *> AssocTypes, ArrayRef<VarDecl *> AssocIds, ArrayRef<Expr *> AssocExprs,
     SourceLocation DefaultLoc, SourceLocation RParenLoc,
     bool ContainsUnexpandedParameterPack) {
   unsigned NumAssocs = AssocExprs.size();
   void *Mem = Context.Allocate(
-      totalSizeToAlloc<Stmt *, TypeSourceInfo *>(1 + NumAssocs, NumAssocs),
+      totalSizeToAlloc<Stmt *, TypeSourceInfo *, VarDecl *>(1 + NumAssocs, NumAssocs, NumAssocs),
       alignof(GenericSelectionExpr));
   return new (Mem) GenericSelectionExpr(
-      Context, GenericLoc, ControllingExpr, AssocTypes, AssocExprs, DefaultLoc,
+      Context, GenericLoc, ControllingExpr, AssocTypes, AssocIds, AssocExprs, DefaultLoc,
       RParenLoc, ContainsUnexpandedParameterPack);
 }
 
 GenericSelectionExpr *GenericSelectionExpr::Create(
     const ASTContext &Context, SourceLocation GenericLoc,
     TypeSourceInfo *ControllingType, ArrayRef<TypeSourceInfo *> AssocTypes,
+    ArrayRef<VarDecl *> AssocDecls,
     ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
     SourceLocation RParenLoc, bool ContainsUnexpandedParameterPack,
     unsigned ResultIndex) {
   unsigned NumAssocs = AssocExprs.size();
   void *Mem = Context.Allocate(
-      totalSizeToAlloc<Stmt *, TypeSourceInfo *>(1 + NumAssocs, NumAssocs),
+      totalSizeToAlloc<Stmt *, TypeSourceInfo *, VarDecl *>(1 + NumAssocs, NumAssocs, NumAssocs),
       alignof(GenericSelectionExpr));
   return new (Mem) GenericSelectionExpr(
-      Context, GenericLoc, ControllingType, AssocTypes, AssocExprs, DefaultLoc,
+      Context, GenericLoc, ControllingType, AssocTypes, AssocDecls, AssocExprs, DefaultLoc,
       RParenLoc, ContainsUnexpandedParameterPack, ResultIndex);
 }
 
 GenericSelectionExpr *GenericSelectionExpr::Create(
     const ASTContext &Context, SourceLocation GenericLoc,
     TypeSourceInfo *ControllingType, ArrayRef<TypeSourceInfo *> AssocTypes,
+    ArrayRef<VarDecl *> AssocDecls,
     ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
     SourceLocation RParenLoc, bool ContainsUnexpandedParameterPack) {
   unsigned NumAssocs = AssocExprs.size();
   void *Mem = Context.Allocate(
-      totalSizeToAlloc<Stmt *, TypeSourceInfo *>(1 + NumAssocs, NumAssocs),
+      totalSizeToAlloc<Stmt *, TypeSourceInfo *, VarDecl *>(1 + NumAssocs, NumAssocs, NumAssocs),
       alignof(GenericSelectionExpr));
   return new (Mem) GenericSelectionExpr(
-      Context, GenericLoc, ControllingType, AssocTypes, AssocExprs, DefaultLoc,
+      Context, GenericLoc, ControllingType, AssocTypes, AssocDecls, AssocExprs, DefaultLoc,
       RParenLoc, ContainsUnexpandedParameterPack);
 }
 
@@ -4788,7 +4800,7 @@ GenericSelectionExpr *
 GenericSelectionExpr::CreateEmpty(const ASTContext &Context,
                                   unsigned NumAssocs) {
   void *Mem = Context.Allocate(
-      totalSizeToAlloc<Stmt *, TypeSourceInfo *>(1 + NumAssocs, NumAssocs),
+      totalSizeToAlloc<Stmt *, TypeSourceInfo *, VarDecl *>(1 + NumAssocs, NumAssocs, NumAssocs),
       alignof(GenericSelectionExpr));
   return new (Mem) GenericSelectionExpr(EmptyShell(), NumAssocs);
 }

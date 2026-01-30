@@ -35,6 +35,7 @@
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/AtomicOrdering.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <optional>
@@ -6205,7 +6206,7 @@ public:
 class GenericSelectionExpr final
     : public Expr,
       private llvm::TrailingObjects<GenericSelectionExpr, Stmt *,
-                                    TypeSourceInfo *> {
+                                    TypeSourceInfo *, VarDecl *> {
   friend class ASTStmtReader;
   friend class ASTStmtWriter;
   friend TrailingObjects;
@@ -6253,6 +6254,9 @@ class GenericSelectionExpr final
     return (int)isTypePredicate();
   }
 
+  unsigned getIndexOfStartOfAssociatedIds() const {
+    return 0;
+  }
 
   /// The location of the "default" and of the right parenthesis.
   SourceLocation DefaultLoc, RParenLoc;
@@ -6280,9 +6284,14 @@ class GenericSelectionExpr final
     return getNumAssocs() + (int)isTypePredicate();
   }
 
+  unsigned numTrailingObjects(OverloadToken<const IdentifierInfo *>) const {
+    return getNumAssocs();
+  }
+
   template <bool Const> class AssociationIteratorTy;
-  /// Bundle together an association expression and its TypeSourceInfo.
-  /// The Const template parameter is for the const and non-const versions
+  /// Bundle together an association expression, its identifier (or nullptr, if one
+  //  is not present) and its TypeSourceInfo. The Const template parameter is for
+  //  the const and non-const versions
   /// of AssociationTy.
   template <bool Const> class AssociationTy {
     friend class GenericSelectionExpr;
@@ -6290,15 +6299,19 @@ class GenericSelectionExpr final
     using ExprPtrTy = std::conditional_t<Const, const Expr *, Expr *>;
     using TSIPtrTy =
         std::conditional_t<Const, const TypeSourceInfo *, TypeSourceInfo *>;
+    using AssocDeclTy = VarDecl *;
+
     ExprPtrTy E;
     TSIPtrTy TSI;
+    AssocDeclTy VD;
     bool Selected;
-    AssociationTy(ExprPtrTy E, TSIPtrTy TSI, bool Selected)
-        : E(E), TSI(TSI), Selected(Selected) {}
+    AssociationTy(ExprPtrTy E, TSIPtrTy TSI, AssocDeclTy VD, bool Selected)
+        : E(E), TSI(TSI), VD(VD), Selected(Selected) {}
 
   public:
     ExprPtrTy getAssociationExpr() const { return E; }
     TSIPtrTy getTypeSourceInfo() const { return TSI; }
+    AssocDeclTy getAssocDecl() const { return VD; }
     QualType getType() const { return TSI ? TSI->getType() : QualType(); }
     bool isSelected() const { return Selected; }
     AssociationTy *operator->() { return this; }
@@ -6334,17 +6347,19 @@ class GenericSelectionExpr final
         std::conditional_t<Const, const Stmt *const *, Stmt **>;
     using TSIPtrPtrTy = std::conditional_t<Const, const TypeSourceInfo *const *,
                                            TypeSourceInfo **>;
+    using AssocDeclPtrTy = VarDecl *const *;
     StmtPtrPtrTy E = nullptr;
     TSIPtrPtrTy TSI; // Kept in sync with E.
+    AssocDeclPtrTy VD; // Kept in sync with E and TSI.
     unsigned Offset = 0, SelectedOffset = 0;
-    AssociationIteratorTy(StmtPtrPtrTy E, TSIPtrPtrTy TSI, unsigned Offset,
+    AssociationIteratorTy(StmtPtrPtrTy E, TSIPtrPtrTy TSI, AssocDeclPtrTy VD, unsigned Offset,
                           unsigned SelectedOffset)
-        : E(E), TSI(TSI), Offset(Offset), SelectedOffset(SelectedOffset) {}
+        : E(E), TSI(TSI), VD(VD), Offset(Offset), SelectedOffset(SelectedOffset) {}
 
   public:
     AssociationIteratorTy() : E(nullptr), TSI(nullptr) {}
     typename BaseTy::reference operator*() const {
-      return AssociationTy<Const>(cast<Expr>(*E), *TSI,
+      return AssociationTy<Const>(cast<Expr>(*E), *TSI, *VD,
                                   Offset == SelectedOffset);
     }
     typename BaseTy::pointer operator->() const { return **this; }
@@ -6352,6 +6367,7 @@ class GenericSelectionExpr final
     AssociationIteratorTy &operator++() {
       ++E;
       ++TSI;
+      ++VD;
       ++Offset;
       return *this;
     }
@@ -6363,6 +6379,7 @@ class GenericSelectionExpr final
   GenericSelectionExpr(const ASTContext &Context, SourceLocation GenericLoc,
                        Expr *ControllingExpr,
                        ArrayRef<TypeSourceInfo *> AssocTypes,
+                       ArrayRef<VarDecl *> AssocDecls,
                        ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
                        SourceLocation RParenLoc,
                        bool ContainsUnexpandedParameterPack,
@@ -6373,6 +6390,7 @@ class GenericSelectionExpr final
   GenericSelectionExpr(const ASTContext &Context, SourceLocation GenericLoc,
                        Expr *ControllingExpr,
                        ArrayRef<TypeSourceInfo *> AssocTypes,
+                       ArrayRef<VarDecl *> AssocDecls,
                        ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
                        SourceLocation RParenLoc,
                        bool ContainsUnexpandedParameterPack);
@@ -6382,6 +6400,7 @@ class GenericSelectionExpr final
   GenericSelectionExpr(const ASTContext &Context, SourceLocation GenericLoc,
                        TypeSourceInfo *ControllingType,
                        ArrayRef<TypeSourceInfo *> AssocTypes,
+                       ArrayRef<VarDecl *> AssocDecls,
                        ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
                        SourceLocation RParenLoc,
                        bool ContainsUnexpandedParameterPack,
@@ -6392,6 +6411,7 @@ class GenericSelectionExpr final
   GenericSelectionExpr(const ASTContext &Context, SourceLocation GenericLoc,
                        TypeSourceInfo *ControllingType,
                        ArrayRef<TypeSourceInfo *> AssocTypes,
+                       ArrayRef<VarDecl *> AssocDecls,
                        ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
                        SourceLocation RParenLoc,
                        bool ContainsUnexpandedParameterPack);
@@ -6405,6 +6425,7 @@ public:
   static GenericSelectionExpr *
   Create(const ASTContext &Context, SourceLocation GenericLoc,
          Expr *ControllingExpr, ArrayRef<TypeSourceInfo *> AssocTypes,
+         ArrayRef<VarDecl*> AssocDecls,
          ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
          SourceLocation RParenLoc, bool ContainsUnexpandedParameterPack,
          unsigned ResultIndex);
@@ -6414,6 +6435,7 @@ public:
   static GenericSelectionExpr *
   Create(const ASTContext &Context, SourceLocation GenericLoc,
          Expr *ControllingExpr, ArrayRef<TypeSourceInfo *> AssocTypes,
+         ArrayRef<VarDecl *> AssocDecls,
          ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
          SourceLocation RParenLoc, bool ContainsUnexpandedParameterPack);
 
@@ -6422,6 +6444,7 @@ public:
   static GenericSelectionExpr *
   Create(const ASTContext &Context, SourceLocation GenericLoc,
          TypeSourceInfo *ControllingType, ArrayRef<TypeSourceInfo *> AssocTypes,
+         ArrayRef<VarDecl*> AssocDecls,
          ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
          SourceLocation RParenLoc, bool ContainsUnexpandedParameterPack,
          unsigned ResultIndex);
@@ -6431,6 +6454,7 @@ public:
   static GenericSelectionExpr *
   Create(const ASTContext &Context, SourceLocation GenericLoc,
          TypeSourceInfo *ControllingType, ArrayRef<TypeSourceInfo *> AssocTypes,
+         ArrayRef<VarDecl*> AssocDecls,
          ArrayRef<Expr *> AssocExprs, SourceLocation DefaultLoc,
          SourceLocation RParenLoc, bool ContainsUnexpandedParameterPack);
 
@@ -6502,6 +6526,17 @@ public:
                                      getResultIndex()]);
   }
 
+  /// Return the variable declaration associated with result, if
+  /// one exists; nullptr otherwise.
+  VarDecl *getResultDecl() {
+    return dyn_cast_or_null<VarDecl>(
+        getTrailingObjects<VarDecl *>()[getResultIndex()]);
+  }
+  const VarDecl *getResultDecl() const {
+    return dyn_cast_or_null<VarDecl>(
+        getTrailingObjects<VarDecl *>()[getResultIndex()]);
+  }
+
   ArrayRef<Expr *> getAssocExprs() const {
     return {reinterpret_cast<Expr *const *>(getTrailingObjects<Stmt *>() +
                                             getIndexOfStartOfAssociatedExprs()),
@@ -6511,6 +6546,9 @@ public:
     return {getTrailingObjects<TypeSourceInfo *>() +
                 getIndexOfStartOfAssociatedTypes(),
             NumAssocs};
+  }
+  ArrayRef<VarDecl *> getAssocDecls() const {
+    return {getTrailingObjects<VarDecl *>(), NumAssocs};
   }
 
   /// Return the Ith association expression with its TypeSourceInfo,
@@ -6524,6 +6562,8 @@ public:
                                          I]),
         getTrailingObjects<
             TypeSourceInfo *>()[getIndexOfStartOfAssociatedTypes() + I],
+        getTrailingObjects<
+            VarDecl *>()[I],
         !isResultDependent() && (getResultIndex() == I));
   }
   ConstAssociation getAssociation(unsigned I) const {
@@ -6535,6 +6575,8 @@ public:
                                          I]),
         getTrailingObjects<
             TypeSourceInfo *>()[getIndexOfStartOfAssociatedTypes() + I],
+        getTrailingObjects<
+            VarDecl *>()[I],
         !isResultDependent() && (getResultIndex() == I));
   }
 
@@ -6543,8 +6585,9 @@ public:
                                   getIndexOfStartOfAssociatedExprs(),
                               getTrailingObjects<TypeSourceInfo *>() +
                                   getIndexOfStartOfAssociatedTypes(),
+                              getTrailingObjects<VarDecl *>(),
                               /*Offset=*/0, ResultIndex);
-    AssociationIterator End(Begin.E + NumAssocs, Begin.TSI + NumAssocs,
+    AssociationIterator End(Begin.E + NumAssocs, Begin.TSI + NumAssocs, Begin.VD + NumAssocs,
                             /*Offset=*/NumAssocs, ResultIndex);
     return llvm::make_range(Begin, End);
   }
@@ -6554,8 +6597,9 @@ public:
                                        getIndexOfStartOfAssociatedExprs(),
                                    getTrailingObjects<TypeSourceInfo *>() +
                                        getIndexOfStartOfAssociatedTypes(),
+                                getTrailingObjects<VarDecl *>(),
                                    /*Offset=*/0, ResultIndex);
-    ConstAssociationIterator End(Begin.E + NumAssocs, Begin.TSI + NumAssocs,
+    ConstAssociationIterator End(Begin.E + NumAssocs, Begin.TSI + NumAssocs, Begin.VD + NumAssocs,
                                  /*Offset=*/NumAssocs, ResultIndex);
     return llvm::make_range(Begin, End);
   }

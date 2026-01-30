@@ -31,6 +31,7 @@
 #include "clang/AST/StmtOpenMP.h"
 #include "clang/AST/StmtSYCL.h"
 #include "clang/Basic/DiagnosticParse.h"
+#include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/OpenMPKinds.h"
 #include "clang/Sema/Designator.h"
 #include "clang/Sema/EnterExpressionEvaluationContext.h"
@@ -3239,10 +3240,11 @@ public:
                                          SourceLocation RParenLoc,
                                          Expr *ControllingExpr,
                                          ArrayRef<TypeSourceInfo *> Types,
+                                         ArrayRef<VarDecl *> Ids,
                                          ArrayRef<Expr *> Exprs) {
     return getSema().CreateGenericSelectionExpr(KeyLoc, DefaultLoc, RParenLoc,
                                                 /*PredicateIsExpr=*/true,
-                                                ControllingExpr, Types, Exprs);
+                                                ControllingExpr, Types, Ids, Exprs);
   }
 
   /// Build a new generic selection expression with a type predicate.
@@ -3254,10 +3256,11 @@ public:
                                          SourceLocation RParenLoc,
                                          TypeSourceInfo *ControllingType,
                                          ArrayRef<TypeSourceInfo *> Types,
+                                         ArrayRef<VarDecl *> Ids,
                                          ArrayRef<Expr *> Exprs) {
     return getSema().CreateGenericSelectionExpr(KeyLoc, DefaultLoc, RParenLoc,
                                                 /*PredicateIsExpr=*/false,
-                                                ControllingType, Types, Exprs);
+                                                ControllingType, Types, Ids, Exprs);
   }
 
   /// Build a new overloaded operator call expression.
@@ -13596,6 +13599,7 @@ TreeTransform<Derived>::TransformGenericSelectionExpr(GenericSelectionExpr *E) {
 
   SmallVector<Expr *, 4> AssocExprs;
   SmallVector<TypeSourceInfo *, 4> AssocTypes;
+  SmallVector<VarDecl *, 4> AssocIds;
   for (const GenericSelectionExpr::Association Assoc : E->associations()) {
     TypeSourceInfo *TSI = Assoc.getTypeSourceInfo();
     if (TSI) {
@@ -13612,6 +13616,8 @@ TreeTransform<Derived>::TransformGenericSelectionExpr(GenericSelectionExpr *E) {
     if (AssocExpr.isInvalid())
       return ExprError();
     AssocExprs.push_back(AssocExpr.get());
+
+    AssocIds.push_back(Assoc.getAssocDecl());
   }
 
   if (!ControllingType)
@@ -13620,10 +13626,11 @@ TreeTransform<Derived>::TransformGenericSelectionExpr(GenericSelectionExpr *E) {
                                                   E->getRParenLoc(),
                                                   ControllingExpr.get(),
                                                   AssocTypes,
+                                                  AssocIds,
                                                   AssocExprs);
   return getDerived().RebuildGenericSelectionExpr(
       E->getGenericLoc(), E->getDefaultLoc(), E->getRParenLoc(),
-      ControllingType, AssocTypes, AssocExprs);
+      ControllingType, AssocTypes, AssocIds, AssocExprs);
 }
 
 template<typename Derived>
