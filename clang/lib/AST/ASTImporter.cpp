@@ -7708,24 +7708,24 @@ ASTNodeImporter::VisitGenericSelectionExpr(GenericSelectionExpr *E) {
     if (ToControllingExpr) {
       return GenericSelectionExpr::Create(
           ToCtx, ToGenericLoc, ToControllingExpr, ArrayRef(ToAssocTypes),
-          ArrayRef(ToAssocExprs), ToDefaultLoc, ToRParenLoc,
+          nullptr, ArrayRef(ToAssocExprs), ToDefaultLoc, ToRParenLoc,
           E->containsUnexpandedParameterPack());
     }
     return GenericSelectionExpr::Create(
         ToCtx, ToGenericLoc, ToControllingType, ArrayRef(ToAssocTypes),
-        ArrayRef(ToAssocExprs), ToDefaultLoc, ToRParenLoc,
+        nullptr, ArrayRef(ToAssocExprs), ToDefaultLoc, ToRParenLoc,
         E->containsUnexpandedParameterPack());
   }
 
   if (ToControllingExpr) {
     return GenericSelectionExpr::Create(
         ToCtx, ToGenericLoc, ToControllingExpr, ArrayRef(ToAssocTypes),
-        ArrayRef(ToAssocExprs), ToDefaultLoc, ToRParenLoc,
+        nullptr, ArrayRef(ToAssocExprs), ToDefaultLoc, ToRParenLoc,
         E->containsUnexpandedParameterPack(), E->getResultIndex());
   }
   return GenericSelectionExpr::Create(
       ToCtx, ToGenericLoc, ToControllingType, ArrayRef(ToAssocTypes),
-      ArrayRef(ToAssocExprs), ToDefaultLoc, ToRParenLoc,
+      nullptr, ArrayRef(ToAssocExprs), ToDefaultLoc, ToRParenLoc,
       E->containsUnexpandedParameterPack(), E->getResultIndex());
 }
 

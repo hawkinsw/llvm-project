@@ -1180,6 +1180,9 @@ public:
 
   llvm::Constant *VisitGenericSelectionExpr(const GenericSelectionExpr *GE,
                                             QualType T) {
+
+  llvm_unreachable("Unexpected NoInitExpr in syntactic form of initializer");
+
     return Visit(GE->getResultExpr(), T);
   }
 

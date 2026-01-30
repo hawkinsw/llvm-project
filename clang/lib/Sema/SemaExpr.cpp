@@ -32,9 +32,11 @@
 #include "clang/AST/OperationKinds.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/TypeBase.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/Builtins.h"
 #include "clang/Basic/DiagnosticSema.h"
+#include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/PartialDiagnostic.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/Specifiers.h"
@@ -50,6 +52,7 @@
 #include "clang/Sema/Initialization.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Overload.h"
+#include "clang/Sema/Ownership.h"
 #include "clang/Sema/ParsedTemplate.h"
 #include "clang/Sema/Scope.h"
 #include "clang/Sema/ScopeInfo.h"
@@ -1784,21 +1787,13 @@ QualType Sema::UsualArithmeticConversions(ExprResult &LHS, ExprResult &RHS,
 //  Semantic Analysis for various Expression Types
 //===----------------------------------------------------------------------===//
 
-
 ExprResult Sema::ActOnGenericSelectionExpr(
     SourceLocation KeyLoc, SourceLocation DefaultLoc, SourceLocation RParenLoc,
     bool PredicateIsExpr, void *ControllingExprOrType,
-    ArrayRef<ParsedType> ArgTypes, ArrayRef<Expr *> ArgExprs) {
+    ArrayRef<TypeSourceInfo *> ArgTypes, ArrayRef<VarDecl *> ArgAssocDecls, ArrayRef<Expr *> ArgExprs) {
   unsigned NumAssocs = ArgTypes.size();
   assert(NumAssocs == ArgExprs.size());
-
-  TypeSourceInfo **Types = new TypeSourceInfo*[NumAssocs];
-  for (unsigned i = 0; i < NumAssocs; ++i) {
-    if (ArgTypes[i])
-      (void) GetTypeFromParser(ArgTypes[i], &Types[i]);
-    else
-      Types[i] = nullptr;
-  }
+  assert(NumAssocs == ArgAssocDecls.size());
 
   // If we have a controlling type, we need to convert it from a parsed type
   // into a semantic type and then pass that along.
@@ -1812,8 +1807,7 @@ ExprResult Sema::ActOnGenericSelectionExpr(
 
   ExprResult ER = CreateGenericSelectionExpr(
       KeyLoc, DefaultLoc, RParenLoc, PredicateIsExpr, ControllingExprOrType,
-      llvm::ArrayRef(Types, NumAssocs), ArgExprs);
-  delete [] Types;
+      ArgTypes, ArgAssocDecls, ArgExprs);
   return ER;
 }
 
@@ -1843,7 +1837,7 @@ static bool areTypesCompatibleForGeneric(ASTContext &Ctx, QualType T,
 ExprResult Sema::CreateGenericSelectionExpr(
     SourceLocation KeyLoc, SourceLocation DefaultLoc, SourceLocation RParenLoc,
     bool PredicateIsExpr, void *ControllingExprOrType,
-    ArrayRef<TypeSourceInfo *> Types, ArrayRef<Expr *> Exprs) {
+    ArrayRef<TypeSourceInfo *> Types, ArrayRef<VarDecl*> AssocDecls, ArrayRef<Expr *> Exprs) {
   unsigned NumAssocs = Types.size();
   assert(NumAssocs == Exprs.size());
   assert(ControllingExprOrType &&
@@ -1988,10 +1982,10 @@ ExprResult Sema::CreateGenericSelectionExpr(
   if (IsResultDependent) {
     if (ControllingExpr)
       return GenericSelectionExpr::Create(Context, KeyLoc, ControllingExpr,
-                                          Types, Exprs, DefaultLoc, RParenLoc,
+                                          Types, AssocDecls, Exprs, DefaultLoc, RParenLoc,
                                           ContainsUnexpandedParameterPack);
     return GenericSelectionExpr::Create(Context, KeyLoc, ControllingType, Types,
-                                        Exprs, DefaultLoc, RParenLoc,
+                                        AssocDecls, Exprs, DefaultLoc, RParenLoc,
                                         ContainsUnexpandedParameterPack);
   }
 
@@ -2072,11 +2066,11 @@ ExprResult Sema::CreateGenericSelectionExpr(
 
   if (ControllingExpr) {
     return GenericSelectionExpr::Create(
-        Context, KeyLoc, ControllingExpr, Types, Exprs, DefaultLoc, RParenLoc,
+        Context, KeyLoc, ControllingExpr, Types, AssocDecls, Exprs, DefaultLoc, RParenLoc,
         ContainsUnexpandedParameterPack, ResultIndex);
   }
   return GenericSelectionExpr::Create(
-      Context, KeyLoc, ControllingType, Types, Exprs, DefaultLoc, RParenLoc,
+      Context, KeyLoc, ControllingType, Types, AssocDecls, Exprs, DefaultLoc, RParenLoc,
       ContainsUnexpandedParameterPack, ResultIndex);
 }
 
@@ -20285,7 +20279,7 @@ static ExprResult rebuildPotentialResultsAsNonOdrUsed(Sema &S, Expr *E,
     return AnyChanged ? S.CreateGenericSelectionExpr(
                             GSE->getGenericLoc(), GSE->getDefaultLoc(),
                             GSE->getRParenLoc(), IsExpr, ExOrTy,
-                            GSE->getAssocTypeSourceInfos(), AssocExprs)
+                            GSE->getAssocTypeSourceInfos(), GSE->getAssocDecls(), AssocExprs)
                       : ExprEmpty();
   }
 
